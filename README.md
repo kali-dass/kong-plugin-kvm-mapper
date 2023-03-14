@@ -11,8 +11,6 @@ The KVM (Key Values Mapping) Mapper pluging provides 2 seperate features
   - The key and respective values are added to the headers
   - Configure multiple keys in plugin
 
-## NOTE: For working version of KVM mapper plugin use branch or tag v0.2.0 that works for service/route/consumer etc
-
 # Admin API
 
 ## What is the API endpoint
@@ -42,14 +40,22 @@ The Admin api is exposed at endpoint
 # KVM-Mapper Pluging
 
 This plugin is configured to provide a list of keys.
-This plugin need to be added in the config file and not added via the Gateway.
+The values for these keys are picked at runtime and added to the headers.
 
 ## What are the parameters
-There is no parameter for this plugin
+There is only one parameter for this plugin called
+
+```kvm_keys```
 
 ## How many keys can be passed
 It is possible to provide multiple keys or single key.
 Atleast one key is expected to be provided.
+
+## Mandatory config
+```kvm_keys``` is mandatory field in plugin specification.
+At least one value needs to be configured for plugin to work.
+
+Plugin will return http 500 status code if parameter is missing.
 
 ## How to pass the keys
 ### Passing one key
@@ -60,6 +66,18 @@ Atleast one key is expected to be provided.
 
 ```http -f :8001/services/{SOME_SERVICE}/plugins name=kvm-mapper config.kvm_keys=xyz config.kvm_keys=abc```
 
+## Key and value added to Header details
+The keys and its values are added to the header as
+
+```
+"X-Kvm-Abc": "Basic TestConfiguredValueabc"
+"X-Kvm-Xyz": "Basic TestingConfigxyz"
+```
+
+## What happens is the keys is not in the KVM
+If the key values is not configured in KVM database, a warning message is left in the kong logs by the plugin.
+But Plugin will not fault.
+
 ### For example
 - If there are 3 keys
 - And only 2 of these are configured via Admin API
@@ -68,9 +86,22 @@ Atleast one key is expected to be provided.
 
 ### Example
 
-Plugin can be called from other plugin by using following code
+Plugin
+- Pluging has configured the keys `abc`, `xyz` and `mno`
 
-```kong.db.kvm_mappings:select_by_key(key)```
+KVM
+- KVM store has the keys `abc` and `xyz`
+- KVM store does not have the key `mno`
+
+Output
+- The output headers will have `abc` and `xyz`.
+- The output will NOT have the header `mno`
+
+Kong logs will have warning
+
+```
+[warn] 68435#0: *3053 [kong] handler.lua:61 [kvm-mapper] Could not find value for kvm key : mno
+```
 
 ## Is there Cache
 The KVM accessed are cached locally at the kong nodes.
@@ -131,11 +162,6 @@ kong migrations bootstrap --force
 kong start
 ```
 
-**Remember to delete the pongo container by running!**
-```
-pongo down
-```
-
 ## Admin API Example
 
 - Add `xyz` key and sample value
@@ -145,6 +171,94 @@ http POST :8001/kvm-mapper key="xyz" value="Basic xyzHasConfiguredThis"
 - Add `abc` key and sample value
 ```
 http POST :8001/kvm-mapper key="abc" value="Basic abcHasConfiguredThis"
+```
+
+## Sample Plugin Config Example
+
+- Add a service to httpbin
+```
+http POST :8001/services name=example-service url=http://httpbin.org
+```
+- Add a route
+```
+http POST :8001/services/example-service/routes name=example-route paths:='["/echo"]'
+```
+- Add the plugin to service with 2 keys
+```
+http -f :8001/services/example-service/plugins name=kvm-mapper config.kvm_keys=xyz config.kvm_keys=abc
+```
+- Call the route
+```
+http :8000/echo/anything
+```
+
+- Output: Should look similar to below
+```
+{
+    "args": {},
+    "data": "",
+    "files": {},
+    "form": {},
+    "headers": {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate",
+        "Host": "httpbin.org",
+        "User-Agent": "HTTPie/2.6.0",
+        "X-Amzn-Trace-Id": "Root=1-61efe7fc-1430ab6c578818a52340b281",
+        "X-Forwarded-Host": "kong-super-farm",
+        "X-Forwarded-Path": "/echo/anything",
+        "X-Forwarded-Prefix": "/echo",
+        "X-Kvm-Abc": "Basic abcHasConfiguredThis",
+        "X-Kvm-Xyz": "Basic xyzHasConfiguredThis"
+    },
+    "json": null,
+    "method": "GET",
+    "origin": "127.0.0.1, 86.29.209.94",
+    "url": "http://kong-super-farm/anything"
+}
+```
+NOTE: The headers are added
+
+`"X-Kvm-Abc": "Basic abcHasConfiguredThis"`
+
+`"X-Kvm-Xyz": "Basic xyzHasConfiguredThis"`
+
+### Admin API update key example
+
+- patch `xyz` key values
+```
+http PATCH :8001/kvm-mapper/xyz value="Basic PATCHTest"
+```
+
+- test for new values
+```
+http :8000/echo/anything
+```
+
+- output
+```
+{
+    "args": {},
+    "data": "",
+    "files": {},
+    "form": {},
+    "headers": {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate",
+        "Host": "httpbin.org",
+        "User-Agent": "HTTPie/2.6.0",
+        "X-Amzn-Trace-Id": "Root=1-61efea6b-466250417ccd63eb2c3cf6e5",
+        "X-Forwarded-Host": "kong-super-farm",
+        "X-Forwarded-Path": "/echo/anything",
+        "X-Forwarded-Prefix": "/echo",
+        "X-Kvm-Abc": "Basic abcHasConfiguredThis",
+        "X-Kvm-Xyz": "Basic PATCHTest"
+    },
+    "json": null,
+    "method": "GET",
+    "origin": "127.0.0.1, 86.29.209.94",
+    "url": "http://kong-super-farm/anything"
+}
 ```
 
 # Migration

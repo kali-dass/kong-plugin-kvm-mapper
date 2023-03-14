@@ -6,7 +6,7 @@ return {
         DROP INDEX IF EXISTS "kvm_mappings_value_idx" CASCADE;
       ]])
 
-      local _, err
+      local _
       _, err = connector:query(drop_query)
       if err then
         return nil, err
@@ -22,7 +22,7 @@ return {
         DROP INDEX IF EXISTS ON kvm_mappings_value_idx;
       ]])
 
-      local _, err
+      local _
       _, err = connector:query(drop_query)
       if err then
         return nil, err

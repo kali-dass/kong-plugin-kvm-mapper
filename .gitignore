@@ -9,3 +9,5 @@ servroot
 luacov.stats.out
 # exclude LuaCov report
 luacov.report.out
+
+.DS_Store
