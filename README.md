@@ -11,6 +11,8 @@ The KVM (Key Values Mapping) Mapper pluging provides 2 seperate features
   - The key and respective values are added to the headers
   - Configure multiple keys in plugin
 
+## NOTE: For working version of KVM mapper plugin use branch or tag v0.2.0 that works for service/route/consumer etc
+
 # Admin API
 
 ## What is the API endpoint
